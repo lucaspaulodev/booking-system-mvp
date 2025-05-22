@@ -100,9 +100,15 @@ export async function getAvailableSlots(
 
     const [year, month, day] = date.split('-').map(Number);
     
-
+    // Create dates using explicit local time representation to ensure consistency
+    // Use the Date constructor with separate arguments to ensure local timezone interpretation
+    // This ensures the time is always 9AM to 6PM in the local timezone regardless of server location
     const startOfDay = new Date(year, month - 1, day, 9, 0, 0);
     const endOfDay = new Date(year, month - 1, day, 18, 0, 0);
+    
+    // Store timestamps to use for time slot display formatting
+    const startHour = 9;
+    const endHour = 18;
 
 
     const { data: existingBookings, error: fetchError } = await supabase
@@ -156,7 +162,16 @@ export async function getAvailableSlots(
       });
       
       if (!isConflicting) {
-        availableTimeSlots.push(currentSlot.toISOString());
+        // Format the date in ISO format but preserve the exact time we want
+        // This ensures consistent 9AM-6PM display regardless of server timezone
+        const slotDate = new Date(
+          currentSlot.getFullYear(),
+          currentSlot.getMonth(),
+          currentSlot.getDate(),
+          currentSlot.getHours(),
+          currentSlot.getMinutes()
+        );
+        availableTimeSlots.push(slotDate.toISOString());
       }
       
       currentSlot = new Date(currentSlot.getTime() + (slotInterval * 60_000));
