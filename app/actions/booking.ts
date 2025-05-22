@@ -7,13 +7,12 @@ import { Booking } from '@/lib/types';
 
 const BOOKING_FIELDS = 'id, center_id, service_id, scheduled, name, email, created_at, updated_at';
 
-const BUSINESS_HOURS_START = 9;
-const BUSINESS_HOURS_END = 18;
 
 export async function createBooking(
   booking: Omit<Booking, 'id' | 'created_at' | 'updated_at'>
 ): Promise<{ data: Booking | null; error: string | null }> {
   try {
+
     const bookingStart = new Date(booking.scheduled);
     const now = new Date();
 
@@ -21,6 +20,7 @@ export async function createBooking(
       return { data: null, error: 'Booking must be in the future.' };
     }
     
+
     const hour = bookingStart.getHours();
     if (hour < 9 || hour >= 18) {
       return { data: null, error: 'Bookings must be between 9 AM and 6 PM.' };
@@ -30,33 +30,54 @@ export async function createBooking(
     if (!duration) {
       return { data: null, error: 'Service not found.' };
     }
-    
-    const availableSlots = await getAvailableSlots(
-      booking.center_id,
-      bookingStart.toISOString().split('T')[0],
-      booking.service_id
-    );
-    
-    if (!availableSlots.data || !availableSlots.data.includes(booking.scheduled)) {
-      return {
-        data: null,
-        error: 'The selected time slot is not available. Please choose another time.'
-      };
+
+    const durationMs = duration * 60_000;
+    const bookingEnd = new Date(bookingStart.getTime() + durationMs);
+
+    const { data: existingBookings, error: fetchError } = await supabase
+      .from('bookings')
+      .select('id, scheduled, service_id, services(duration)')
+      .eq('center_id', booking.center_id);
+
+    if (fetchError) {
+      return { data: null, error: 'Error checking booking conflicts.' };
     }
 
-    const { data, error } = await supabase
+    const conflicts = await Promise.all((existingBookings || []).map(async (existingBooking) => {
+      const existingStart = new Date(existingBooking.scheduled);
+      
+      let existingDuration = 0; 
+      if (existingBooking.services && 'duration' in existingBooking.services) {
+        existingDuration = Number(existingBooking.services.duration) || 0;
+      } else {
+        const duration = await getServiceDuration(existingBooking.service_id);
+        if (duration !== null) {
+          existingDuration = duration;
+        }
+      }
+      
+      const existingEnd = new Date(existingStart.getTime() + (existingDuration * 60_000));
+      
+      return (bookingStart < existingEnd && bookingEnd > existingStart);
+    }));
+
+    if (conflicts.some(conflict => conflict)) {
+      return { data: null, error: 'Time slot is already booked.' };
+    }
+
+    const { data: newBooking, error } = await supabase
       .from('bookings')
       .insert([booking])
       .select(BOOKING_FIELDS)
       .single();
 
     if (error) {
-      return { data: null, error: error.message };
+      return { data: null, error: 'Failed to create booking.' };
     }
 
-    revalidatePath(`/${booking.center_id}`);
+    revalidatePath('/bookings');
     
-    return { data, error: null };
+    return { data: newBooking as Booking, error: null };
   } catch (error) {
     return { 
       data: null, 
@@ -75,25 +96,30 @@ export async function getAvailableSlots(
     if (!duration) {
       return { data: null, error: 'Service not found or has no duration set.' };
     }
+
+
     const [year, month, day] = date.split('-').map(Number);
     
-    const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const startOfDay = new Date(year, month - 1, day, 9, 0, 0);
+    const endOfDay = new Date(year, month - 1, day, 18, 0, 0);
+    
+    const startHour = 9;
+    const endHour = 18;
+
+
     const { data: existingBookings, error: fetchError } = await supabase
       .from('bookings')
       .select('id, scheduled, service_id, services(duration)')
       .eq('center_id', centerId)
-      .like('scheduled', `${formattedDate}%`);
+      .gte('scheduled', startOfDay.toISOString())
+      .lt('scheduled', endOfDay.toISOString());
       
     if (fetchError) {
       return { data: null, error: 'Error fetching existing bookings.' };
     }
-    
-    const bookedRanges = [];
-    for (const booking of existingBookings || []) {
-      const bookingDate = new Date(booking.scheduled);
-      
-      const hours = bookingDate.getHours();
-      const minutes = bookingDate.getMinutes();
+
+    const bookedRanges = await Promise.all((existingBookings || []).map(async (booking) => {
+      const start = new Date(booking.scheduled);
       
       let bookingDuration = 0;
       if (booking.services && 'duration' in booking.services) {
@@ -105,43 +131,44 @@ export async function getAvailableSlots(
         }
       }
       
-      const startMinutes = hours * 60 + minutes;
-      const endMinutes = startMinutes + bookingDuration;
+      const end = new Date(start.getTime() + (bookingDuration * 60_000));
       
-      bookedRanges.push({
-        startMinutes,
-        endMinutes,
+      return {
+        start,
+        end,
         serviceId: booking.service_id
-      });
-    }
+      };
+    }));
 
-    const availableTimeSlots = [];
-    const slotInterval = 30;
+
+    const availableTimeSlots: string[] = [];
+    const slotInterval = 30; 
     const serviceDurationMinutes = duration;
     
-    const startMinutes = BUSINESS_HOURS_START * 60;
-    const endMinutes = BUSINESS_HOURS_END * 60;
+    let currentSlot = new Date(startOfDay);
+    const lastSlotStart = new Date(endOfDay.getTime() - (serviceDurationMinutes * 60_000));
     
-    for (let slotStart = startMinutes; slotStart < endMinutes; slotStart += slotInterval) {
-      if (slotStart + serviceDurationMinutes > endMinutes) {
-        continue;
-      }
-      
-      const slotEnd = slotStart + serviceDurationMinutes;
+    while (currentSlot <= lastSlotStart) {
+      const slotEnd = new Date(currentSlot.getTime() + (serviceDurationMinutes * 60_000));
       
       const isConflicting = bookedRanges.some(range => {
-        return (slotStart < range.endMinutes && slotEnd > range.startMinutes);
+        const hasOverlap = (currentSlot < range.end && slotEnd > range.start);
+        
+        return hasOverlap;
       });
       
       if (!isConflicting) {
-        const slotHour = Math.floor(slotStart / 60);
-        const slotMinute = slotStart % 60;
-        
-        const timeString = `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}:00`;
-        const formattedSlot = `${formattedDate}T${timeString}.000Z`;
-        
-        availableTimeSlots.push(formattedSlot);
+        const slotDate = new Date(
+          currentSlot.getFullYear(),
+          currentSlot.getMonth(),
+          currentSlot.getDate(),
+          currentSlot.getHours(),
+          currentSlot.getMinutes()
+        );
+        availableTimeSlots.push(slotDate.toISOString());
       }
+      
+      currentSlot = new Date(currentSlot.getTime() + (slotInterval * 60_000));
     }
 
     return { data: availableTimeSlots, error: null };
