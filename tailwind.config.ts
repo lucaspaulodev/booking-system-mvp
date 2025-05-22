@@ -18,6 +18,10 @@ const config = {
       },
     },
     extend: {
+      fontFamily: {
+        playfair: ["var(--font-playfair)"],
+        poppins: ["var(--font-poppins)"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
