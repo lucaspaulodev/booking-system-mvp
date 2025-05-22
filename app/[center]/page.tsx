@@ -5,18 +5,17 @@ import { CenterPageClient } from '@/components/center-page-client';
 export default async function CenterPage({
   params,
 }: {
-  params: { center: string };
+  params: Promise<{ center: string }>;
 }) {
+  const { center: slug } = await params;
   try {
-    const centerSlug = params.center;
-    
-    const result = await getCenter(centerSlug);
+    const result = await getCenter(slug);
     
     if (!result.data) {
       notFound();
     }
     
-    return <CenterPageClient slug={centerSlug} />;
+    return <CenterPageClient slug={slug} />;
   } catch (error) {
     notFound();
   }
