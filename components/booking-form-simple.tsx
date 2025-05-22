@@ -112,42 +112,39 @@ export function BookingFormSimple({ centerId, service, onCancel }: BookingFormPr
   
   return (
     <>
-      <div className="space-y-6 p-4">
-        <h2 className="text-xl font-semibold">Book {service.name}</h2>
-        <p className="text-sm text-gray-500">{service.description}</p>
-        
+      <div className="space-y-4">
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded mb-4">
+          <div className="bg-red-50 text-red-600 p-3 rounded text-sm">
             {error}
           </div>
         )}
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium">Name</label>
             <input 
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full rounded-md border p-2"
+              className="w-full rounded-md border p-2.5 text-base sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="Your name"
             />
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium">Email</label>
             <input 
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full rounded-md border p-2"
+              className="w-full rounded-md border p-2.5 text-base sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="your.email@example.com"
             />
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium">Date</label>
             <input 
               type="date"
@@ -155,18 +152,18 @@ export function BookingFormSimple({ centerId, service, onCancel }: BookingFormPr
               value={formData.date}
               onChange={handleChange}
               min={minDate}
-              className="w-full rounded-md border p-2"
+              className="w-full rounded-md border p-2.5 text-base sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium">Time</label>
             <select
               name="time"
               value={formData.time}
               onChange={handleChange}
               disabled={!formData.date || isLoadingSlots || formattedSlots.length === 0}
-              className="w-full rounded-md border p-2"
+              className="w-full rounded-md border p-2.5 text-base sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none bg-white"
             >
               <option value="">Select a time slot</option>
               {formattedSlots.map((slot) => (
@@ -176,25 +173,25 @@ export function BookingFormSimple({ centerId, service, onCancel }: BookingFormPr
               ))}
             </select>
             {isLoadingSlots && formData.date && (
-              <p className="text-sm text-blue-500">Loading available time slots...</p>
+              <p className="text-xs text-blue-500 mt-1">Loading available time slots...</p>
             )}
             {formattedSlots.length === 0 && formData.date && !isLoadingSlots && (
-              <p className="text-sm text-gray-500">No available slots for this date</p>
+              <p className="text-xs text-gray-500 mt-1">No available slots for this date</p>
             )}
           </div>
           
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4 mt-2">
             <button 
               type="button" 
               onClick={onCancel}
-              className="px-4 py-2 border rounded-md"
+              className="px-4 py-2.5 border rounded-md text-gray-700 hover:bg-gray-50 w-full sm:w-auto text-base sm:text-sm"
             >
               Cancel
             </button>
             <button 
               type="submit" 
               disabled={isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:bg-blue-300"
+              className="px-4 py-2.5 bg-blue-600 text-white rounded-md disabled:bg-blue-300 hover:bg-blue-700 w-full sm:w-auto text-base sm:text-sm"
             >
               {isPending ? "Booking..." : "Book Appointment"}
             </button>
@@ -203,13 +200,20 @@ export function BookingFormSimple({ centerId, service, onCancel }: BookingFormPr
       </div>
       
       {showSuccess && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full">
-            <h3 className="text-lg font-bold mb-2">Booking Confirmed!</h3>
-            <p className="mb-4">Your appointment for {service.name} has been booked. You will receive a confirmation email shortly.</p>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-5 sm:p-6 rounded-xl max-w-xs sm:max-w-md w-full shadow-xl">
+            <div className="flex flex-col items-center text-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold mb-1">Booking Confirmed!</h3>
+              <p className="text-sm text-gray-500">Your appointment for {service.name} has been booked. You will receive a confirmation email shortly.</p>
+            </div>
             <button 
               onClick={handleClose}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md w-full"
+              className="px-4 py-2.5 bg-blue-600 text-white rounded-md w-full hover:bg-blue-700 text-base sm:text-sm"
             >
               Close
             </button>
