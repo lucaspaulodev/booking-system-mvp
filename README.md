@@ -161,7 +161,7 @@ Total development time: Approximately 3 hours
 
 ## 🚀 Deployed Application
 
-[Link to deployed application](https://your-deployment-url.com)
+[Link to deployed application](https://booking-system-mvp.vercel.app/)
 
 ## 🔮 Future Improvements
 
